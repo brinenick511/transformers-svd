@@ -962,12 +962,12 @@ def check_model_inputs(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         # Use inspect to bind args/kwargs to parameter names
-        output_attentions = kwargs.pop("output_attentions", None)
-        if output_attentions is None:
-            output_attentions = self.config.output_attentions
-        output_hidden_states = kwargs.pop("output_hidden_states", None)
-        if output_hidden_states is None:
-            output_hidden_states = self.config.output_hidden_states
+        recordable_keys = list(self._can_record_outputs.keys())
+        capture_flags = {
+            key: kwargs.pop(f"output_{key}", getattr(self.config, f"output_{key}", False))
+            for key in recordable_keys
+        }
+
         use_cache = kwargs.get("use_cache", self.config.use_cache)
         return_dict = kwargs.get("return_dict", self.config.use_return_dict)
         kwargs.setdefault("use_cache", use_cache)
@@ -979,38 +979,40 @@ def check_model_inputs(func):
             logger.warning("`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`.")
             kwargs["use_cache"] = False  # update it directly in kwargs
 
+        # Collect hooks and outputs
         hooks = []
-        collected_attentions = []
-        collected_hidden_states = []
+        collected = {key: [] for key, enabled in capture_flags.items() if enabled}
 
-        def capture_outputs(module, input, output):
-            if output_hidden_states:
-                collected_hidden_states.append(output[0])
-            if output_attentions:
-                collected_attentions.append(output[1])
+        def make_capture_fn(key, index):
+            def capture_fn(module, input, output):
+                collected[key].append(output[index])
+            return capture_fn
 
-        # Register hooks if needed
-        if output_attentions or output_hidden_states:
+        if any(capture_flags.values()):
             for _, layer in self.named_modules():
-                if isinstance(layer, GradientCheckpointingLayer):
-                    hooks.append(register_hook_if_needed(layer, capture_outputs))
+                for key, (cls, idx) in self._can_record_outputs.items():
+                    if capture_flags.get(key, False) and isinstance(layer, cls):
+                        hook_fn = make_capture_fn(key, idx)
+                        hooks.append(register_hook_if_needed(layer, hook_fn))
 
 
         outputs = func(self, *args, **kwargs)
-        if output_attentions or output_hidden_states:
-            for h in hooks:
-                if h is not None:
-                    h.remove()
+        for h in hooks:
+            if h is not None:
+                h.remove()
 
-        if output_hidden_states:
-            collected_hidden_states.append(outputs.last_hidden_state)
-            outputs["hidden_states"] = tuple(collected_hidden_states)
-        elif not return_dict:
-            outputs["hidden_states"] = None
-        if output_attentions:
-            outputs["attentions"] = tuple(collected_attentions)
-        elif not return_dict:
-            outputs["attentions"] = None
+        # Insert collected outputs
+        for key in collected:
+            # Optional: append a final model-level output like `last_hidden_state` for hidden_states
+            # if needed. You can customize this as per key semantics.
+            outputs[key] = tuple(collected[key]) if collected[key] else None
+
+        # Fill missing keys with None if not using return_dict
+        if return_dict is False:
+            for key in recordable_keys:
+                if key not in outputs:
+                    outputs[key] = None
+
         if return_dict is False:
             outputs = outputs.to_tuple()
         return outputs
