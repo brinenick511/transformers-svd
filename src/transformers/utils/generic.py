@@ -965,6 +965,9 @@ def check_model_inputs(func):
             kwargs["return_dict"] = False
 
         use_cache = kwargs["use_cache"]
+        if getattr(self, "gradient_checkpointing", False) and getattr(self, "training", False) and use_cache:
+            logger.warning("`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`.")
+            kwargs["use_cache"] = False  # update it directly in kwargs
 
         hooks = []
         collected_attentions = []
@@ -978,17 +981,12 @@ def check_model_inputs(func):
 
         # Register hooks if needed
         if output_attentions or output_hidden_states:
-            with torch.compiler.disable():  # Avoid issues with torch.compile
-                for _, layer in self.named_modules():
-                    if isinstance(layer, GradientCheckpointingLayer):
-                        hooks.append(layer.register_forward_hook(capture_outputs))
-
-        if getattr(self, "gradient_checkpointing", False) and getattr(self, "training", False) and use_cache:
-            logger.warning("`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`.")
-            kwargs["use_cache"] = False  # update it directly in kwargs
+            for _, layer in self.named_modules():
+                if isinstance(layer, GradientCheckpointingLayer):
+                    hooks.append(layer.register_forward_hook(capture_outputs))
 
 
-        outputs = func(self, **kwargs)
+        outputs = func(self, *args, **kwargs)
         if output_attentions or output_hidden_states:
             for h in hooks:
                 h.remove()
