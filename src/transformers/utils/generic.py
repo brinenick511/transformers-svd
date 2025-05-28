@@ -952,61 +952,43 @@ def check_model_inputs(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         # Use inspect to bind args/kwargs to parameter names
-        if torch.compiler.is_compiling():
-            return func(self, *args, **kwargs)
-        sig = inspect.signature(func)
-        bound = sig.bind_partial(self, *args, **kwargs)
-        all_args = bound.arguments
-        all_args.update(all_args.pop("kwargs", {}))
-        self = all_args.pop("self", self)
-        output_attentions = all_args.get("output_attentions", None)
+        output_attentions = kwargs.pop("output_attentions", None)
         if output_attentions is None:
             output_attentions = self.config.output_attentions
-        output_hidden_states = all_args.get("output_hidden_states", None)
+        output_hidden_states = kwargs.pop("output_hidden_states", None)
         if output_hidden_states is None:
             output_hidden_states = self.config.output_hidden_states
-        use_cache = all_args.get("use_cache", self.config.use_cache)
-        return_dict = all_args.pop("return_dict", self.config.use_return_dict)
+        use_cache = kwargs.get("use_cache", self.config.use_cache)
+        return_dict = kwargs.get("return_dict", self.config.use_return_dict)
+        kwargs.setdefault("use_cache", use_cache)
+        if "return_dict" in kwargs:
+            kwargs["return_dict"] = False
 
-        # Safely extract common config-backed flags
-        all_args.setdefault("output_attentions", output_attentions)
-        all_args.setdefault("output_hidden_states", output_hidden_states)
-        all_args.setdefault("use_cache", use_cache)
-        if "return_dict" in all_args:
-            all_args["return_dict"] = False
+        use_cache = kwargs["use_cache"]
 
-        # Extract input_ids and inputs_embeds more robustly
-        input_ids = all_args.get("input_ids", None)
-        inputs_embeds = all_args.get("inputs_embeds", None)
-
-        use_cache = all_args["use_cache"]
-        past_key_values = all_args.get("past_key_values", None)
         hooks = []
         collected_attentions = []
         collected_hidden_states = []
+
+        def capture_outputs(module, input, output):
+            if output_hidden_states:
+                collected_hidden_states.append(output[0])
+            if output_attentions:
+                collected_attentions.append(output[1])
+
+        # Register hooks if needed
         if output_attentions or output_hidden_states:
-
-            def output_hidden_and_attention(module, input, output):
-                if output_hidden_states:
-                    collected_hidden_states.append(output[0])
-                if output_attentions:
-                    collected_attentions.append(output[1])
-
-            for _, layer in self.named_modules():
-                if isinstance(layer, GradientCheckpointingLayer):  # TODO a bit slow to iterate over all layers no?
-                    hooks.append(layer.register_forward_hook(output_hidden_and_attention))
-
-        if (input_ids is None) ^ (inputs_embeds is not None):
-            raise ValueError("You must specify exactly one of input_ids or inputs_embeds.")
+            with torch.compiler.disable():  # Avoid issues with torch.compile
+                for _, layer in self.named_modules():
+                    if isinstance(layer, GradientCheckpointingLayer):
+                        hooks.append(layer.register_forward_hook(capture_outputs))
 
         if getattr(self, "gradient_checkpointing", False) and getattr(self, "training", False) and use_cache:
             logger.warning("`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`.")
-            all_args["use_cache"] = False  # update it directly in kwargs
+            kwargs["use_cache"] = False  # update it directly in kwargs
 
-        if past_key_values is not None and "Cache" not in past_key_values.__class__.__name__:
-            raise ValueError("The `past_key_values` should be either a `Cache` object or `None`.")
 
-        outputs = func(self, **all_args)
+        outputs = func(self, **kwargs)
         if output_attentions or output_hidden_states:
             for h in hooks:
                 h.remove()
