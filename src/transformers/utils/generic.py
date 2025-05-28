@@ -951,40 +951,42 @@ def check_model_inputs(func):
 
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        print(kwargs)
-        output_attentions = kwargs.get("output_attentions", self.config.output_attentions)
-        output_hidden_states = kwargs.get("output_hidden_states", self.config.output_hidden_states)
-        use_cache = kwargs.get("use_cache", self.config.use_cache)
-        return_dict = kwargs.pop("return_dict", self.config.use_return_dict)
+        # Use inspect to bind args/kwargs to parameter names
+        if torch.compiler.is_compiling():
+            return func(self, *args, **kwargs)
+        sig = inspect.signature(func
+        bound = sig.bind_partial(self, *args, **kwargs)
+        all_args = bound.arguments
+        all_args.update(**kwargs)
+        self = all_args.pop("self", self)
+        output_attentions = all_args.get("output_attentions", self.config.output_attentions)
+        output_hidden_states = all_args.get("output_hidden_states", self.config.output_hidden_states)
+        use_cache = all_args.get("use_cache", self.config.use_cache)
+        return_dict = all_args.pop("return_dict", self.config.use_return_dict)
 
         # Safely extract common config-backed flags
-        kwargs.setdefault("output_attentions", output_attentions)
-        kwargs.setdefault("output_hidden_states", output_hidden_states)
-        kwargs.setdefault("use_cache", use_cache)
-        kwargs["return_dict"] = kwargs.pop("return_dict", return_dict)
-
-        # Use inspect to bind args/kwargs to parameter names
-        sig = inspect.signature(func)
-        bound = sig.bind_partial(self, *args, **kwargs)
-        bound.apply_defaults()
-        all_args = bound.arguments
+        all_args.setdefault("output_attentions", output_attentions)
+        all_args.setdefault("output_hidden_states", output_hidden_states)
+        all_args.setdefault("use_cache", use_cache)
+        if "return_dict" in all_args:
+            all_args["return_dict"] = False
 
         # Extract input_ids and inputs_embeds more robustly
         input_ids = all_args.get("input_ids", None)
         inputs_embeds = all_args.get("inputs_embeds", None)
 
-        use_cache = kwargs["use_cache"]
-        past_key_values = kwargs.get("past_key_values", None)
+        use_cache = all_args["use_cache"]
+        past_key_values = all_args.get("past_key_values", None)
         hooks = []
         collected_attentions = []
         collected_hidden_states = []
         if output_attentions or output_hidden_states:
 
-            def output_hidden_and_attention(module, inp, out):
+            def output_hidden_and_attention(module, input, output):
                 if output_hidden_states:
-                    collected_hidden_states.append(out[0])
+                    collected_hidden_states.append(output[0])
                 if output_attentions:
-                    collected_attentions.append(out[1])
+                    collected_attentions.append(output[1])
 
             for _, layer in self.named_modules():
                 if isinstance(layer, GradientCheckpointingLayer):  # TODO a bit slow to iterate over all layers no?
@@ -995,12 +997,12 @@ def check_model_inputs(func):
 
         if getattr(self, "gradient_checkpointing", False) and getattr(self, "training", False) and use_cache:
             logger.warning("`use_cache=True` is incompatible with gradient checkpointing. Setting `use_cache=False`.")
-            kwargs["use_cache"] = False  # update it directly in kwargs
+            all_args["use_cache"] = False  # update it directly in kwargs
 
         if past_key_values is not None and "Cache" not in past_key_values.__class__.__name__:
             raise ValueError("The `past_key_values` should be either a `Cache` object or `None`.")
 
-        outputs = func(self, *args, **kwargs)
+        outputs = func(self, **all_args)
         if output_attentions or output_hidden_states:
             for h in hooks:
                 h.remove()
