@@ -957,7 +957,7 @@ def check_model_inputs(func):
         sig = inspect.signature(func)
         bound = sig.bind_partial(self, *args, **kwargs)
         all_args = bound.arguments
-        all_args.update(**kwargs)
+        all_args.update(all_args.pop("kwargs", {}))
         self = all_args.pop("self", self)
         output_attentions = all_args.get("output_attentions", self.config.output_attentions)
         output_hidden_states = all_args.get("output_hidden_states", self.config.output_hidden_states)
@@ -1013,7 +1013,7 @@ def check_model_inputs(func):
         else:
             outputs["hidden_states"] = None
         if output_attentions:
-            outputs["attention"] = tuple(collected_attentions)
+            outputs["attentions"] = tuple(collected_attentions)
         else:
             outputs["attentions"] = None
         if return_dict is False:
