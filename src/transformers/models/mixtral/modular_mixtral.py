@@ -19,7 +19,6 @@
 # limitations under the License.
 """PyTorch Mixtral model."""
 
-from functools import partial
 from typing import List, Optional, Tuple, Union
 
 import torch
@@ -275,9 +274,7 @@ class MixtralPreTrainedModel(MistralPreTrainedModel):
 
 
 class MixtralModel(MistralModel):
-    _can_record_outputs = {
-        "roouter_logits": (MixtralBlockSparseTop2MLP, 1)
-    }
+    _can_record_outputs = {"roouter_logits": (MixtralBlockSparseTop2MLP, 1)}
 
     def forward(
         self,
@@ -290,7 +287,6 @@ class MixtralModel(MistralModel):
         cache_position: Optional[torch.LongTensor] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> MoeModelOutputWithPast:
-
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
@@ -322,22 +318,20 @@ class MixtralModel(MistralModel):
         # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
         for decoder_layer in self.layers:
+            layer_outputs = decoder_layer(
+                hidden_states,
+                attention_mask=causal_mask,
+                position_ids=position_ids,
+                past_key_value=past_key_values,
+                output_attentions=output_attentions,
+                output_router_logits=output_router_logits,
+                use_cache=use_cache,
+                cache_position=cache_position,
+                position_embeddings=position_embeddings,
+                **kwargs,
+            )
 
-
-                layer_outputs = decoder_layer(
-                    hidden_states,
-                    attention_mask=causal_mask,
-                    position_ids=position_ids,
-                    past_key_value=past_key_values,
-                    output_attentions=output_attentions,
-                    output_router_logits=output_router_logits,
-                    use_cache=use_cache,
-                    cache_position=cache_position,
-                    position_embeddings=position_embeddings,
-                    **kwargs,
-                )
-
-            hidden_states = layer_outputs[0]
+        hidden_states = layer_outputs[0]
 
         hidden_states = self.norm(hidden_states)
 
@@ -419,9 +413,9 @@ class MixtralForCausalLM(MistralForCausalLM):
         loss = None
         if labels is not None:
             loss = self.loss_function(logits, labels, self.vocab_size, **kwargs)
-
+""
         aux_loss = None
-        if output_router_logits:
+        if outputs.router_logits is not None:
             aux_loss = load_balancing_loss_func(
                 outputs.router_logits,
                 self.num_experts,
