@@ -959,8 +959,12 @@ def check_model_inputs(func):
         all_args = bound.arguments
         all_args.update(all_args.pop("kwargs", {}))
         self = all_args.pop("self", self)
-        output_attentions = all_args.get("output_attentions", self.config.output_attentions)
-        output_hidden_states = all_args.get("output_hidden_states", self.config.output_hidden_states)
+        output_attentions = all_args.get("output_attentions", None)
+        if output_attentions is None:
+            output_attentions = self.config.output_attentions
+        output_hidden_states = all_args.get("output_hidden_states", None)
+        if output_hidden_states is None:
+            output_hidden_states = self.config.output_hidden_states
         use_cache = all_args.get("use_cache", self.config.use_cache)
         return_dict = all_args.pop("return_dict", self.config.use_return_dict)
 
@@ -1010,11 +1014,11 @@ def check_model_inputs(func):
         if output_hidden_states:
             collected_hidden_states.append(outputs.last_hidden_state)
             outputs["hidden_states"] = tuple(collected_hidden_states)
-        else:
+        elif not return_dict:
             outputs["hidden_states"] = None
         if output_attentions:
             outputs["attentions"] = tuple(collected_attentions)
-        else:
+        elif not return_dict:
             outputs["attentions"] = None
         if return_dict is False:
             outputs = outputs.to_tuple()
