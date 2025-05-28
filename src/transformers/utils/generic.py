@@ -954,7 +954,7 @@ def check_model_inputs(func):
         # Use inspect to bind args/kwargs to parameter names
         if torch.compiler.is_compiling():
             return func(self, *args, **kwargs)
-        sig = inspect.signature(func
+        sig = inspect.signature(func)
         bound = sig.bind_partial(self, *args, **kwargs)
         all_args = bound.arguments
         all_args.update(**kwargs)
@@ -1009,9 +1009,13 @@ def check_model_inputs(func):
 
         if output_hidden_states:
             collected_hidden_states.append(outputs.last_hidden_state)
-            outputs.hidden_states = tuple(collected_hidden_states)
+            outputs["hidden_states"] = tuple(collected_hidden_states)
+        else:
+            outputs["hidden_states"] = None
         if output_attentions:
-            outputs.attentions = tuple(collected_attentions)
+            outputs["attention"] = tuple(collected_attentions)
+        else:
+            outputs["attentions"] = None
         if return_dict is False:
             outputs = outputs.to_tuple()
         return outputs
