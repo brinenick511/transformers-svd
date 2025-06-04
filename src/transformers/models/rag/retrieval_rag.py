@@ -267,6 +267,7 @@ class CanonicalHFIndex(HFIndexBase):
         index_path: Optional[str] = None,
         use_dummy_dataset=False,
         dataset_revision=None,
+        trust_remote_code=False,
     ):
         if int(index_path is None) + int(index_name is None) != 1:
             raise ValueError("Please provide `index_name` or `index_path`.")
@@ -283,6 +284,7 @@ class CanonicalHFIndex(HFIndexBase):
             split=self.dataset_split,
             dummy=self.use_dummy_dataset,
             revision=dataset_revision,
+            trust_remote_code=trust_remote_code,
         )
         super().__init__(vector_size, dataset, index_initialized=False)
 
@@ -414,7 +416,7 @@ class RagRetriever:
         self.return_tokenized_docs = False
 
     @staticmethod
-    def _build_index(config):
+    def _build_index(config, trust_remote_code=False):
         if config.index_name == "legacy":
             return LegacyIndex(
                 config.retrieval_vector_size,
@@ -435,6 +437,7 @@ class RagRetriever:
                 index_path=config.index_path,
                 use_dummy_dataset=config.use_dummy_dataset,
                 dataset_revision=config.dataset_revision,
+                trust_remote_code=trust_remote_code,
             )
 
     @classmethod
@@ -448,7 +451,8 @@ class RagRetriever:
             config.index_name = "custom"
             index = CustomHFIndex(config.retrieval_vector_size, indexed_dataset)
         else:
-            index = cls._build_index(config)
+            trust_remote_code = kwargs.get("trust_remote_code", False)
+            index = cls._build_index(config, trust_remote_code=trust_remote_code)
         return cls(
             config,
             question_encoder_tokenizer=question_encoder_tokenizer,
