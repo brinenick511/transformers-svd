@@ -4145,7 +4145,7 @@ class Qwen2_5OmniForConditionalGeneration(Qwen2_5OmniPreTrainedModel, Generation
             self.token2wav.float()
 
         token2wav_device = self.token2wav.device
-        if token2wav_device.dtype == "meta":
+        if token2wav_device.type == "meta":
             token2wav_device = self.thinker.device
 
         wav = self.token2wav(
