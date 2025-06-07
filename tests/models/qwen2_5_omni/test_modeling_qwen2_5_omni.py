@@ -603,7 +603,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
         # verify generation
         inputs = inputs.to(torch_device)
 
-        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, return_audio=False, max_new_tokens=20)
+        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, return_audio=False, thinker_max_new_tokens=20)
 
         EXPECTED_DECODED_TEXT = "system\nYou are a helpful assistant.\nuser\nWhat's that sound and what kind of dog is this?\nassistant\nThe sound is glass shattering, and the dog is a Labrador Retriever."
 
@@ -626,7 +626,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
             padding=True,
         ).to(torch_device, dtype=torch.bfloat16)
 
-        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, return_audio=False, max_new_tokens=20)
+        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, return_audio=False, thinker_max_new_tokens=20)
 
         EXPECTED_DECODED_TEXT = [
             "system\nYou are a helpful assistant.\nuser\nWhat's that sound and what kind of dog is this?\nassistant\nThe sound is of glass shattering, and the dog in the picture is a Labrador Retriever.",
@@ -673,7 +673,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
             padding=True,
         ).to(torch_device, dtype=torch.bfloat16)
 
-        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, return_audio=False, max_new_tokens=20)
+        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, return_audio=False, thinker_max_new_tokens=20)
 
         EXPECTED_DECODED_TEXT = "system\nYou are a helpful assistant.\nuser\nWhat's that sound and what kind of dog is this?\nassistant\nThe sound is glass shattering, and the dog appears to be a Labrador Retriever.\nuser\nHow about this one?\nassistant\nThe sound is a cough."
 
@@ -709,7 +709,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = self.processor(text=text, audio=[audio], return_tensors="pt", padding=True).to(torch_device, dtype=torch.bfloat16)
 
-        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, max_new_tokens=20)
+        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, thinker_max_new_tokens=20, talker_max_new_tokens=10)
 
         EXPECTED_DECODED_TEXT = "system\nYou are Qwen, a virtual human developed by the Qwen Team, Alibaba Group, capable of perceiving auditory and visual inputs, as well as generating text and speech.\nuser\n\nassistant\nWell, I can't really guess your age and gender just from your voice. There are so many factors that can affect how a voice sounds, like the environment you're in, how you're feeling at the moment, and even the microphone you're using. But if you want to share more about your voice, like if it's high - pitched or low - pitched, that might give me a bit of an idea. So, what can you tell me about your voice?"
 
