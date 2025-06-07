@@ -555,7 +555,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
     @slow
     def test_small_model_integration_test(self):
         model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
-            "Qwen/Qwen2.5-Omni-7B", torch_dtype=torch.float32, device_map="auto"
+            "Qwen/Qwen2.5-Omni-7B", torch_dtype=torch.float16, device_map="auto"
         )
 
         text = self.processor.apply_chat_template(self.messages, tokenize=False, add_generation_prompt=True)
@@ -595,7 +595,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
                 [1.3902, 1.4048, 1.4194],
                 [1.5216, 1.5362, 1.5362],
             ],
-            dtype=torch.float32,
+            dtype=torch.float16,
             device="cpu",
         )
         assert torch.allclose(expected_pixel_slice, inputs.pixel_values[:6, :3], atol=3e-3)
