@@ -641,7 +641,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
     @slow
     def test_small_model_integration_test_multiturn(self):
         model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
-            "Qwen/Qwen2.5-Omni-7B", torch_dtype=torch.float32, device_map="auto"
+            "Qwen/Qwen2.5-Omni-7B", torch_dtype=torch.bfloat16, device_map="auto"
         )
 
         messages = [
@@ -666,17 +666,18 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
 
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         inputs = self.processor(
-            text=[text],
+            text=text,
             audio=[self.raw_audio, self.raw_audio_additional],
             images=[self.raw_image],
             return_tensors="pt",
             padding=True,
-        ).to(torch_device)
+        ).to(torch_device, dtype=torch.bfloat16)
 
-        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, return_audio=False)
+        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, return_audio=False, max_new_tokens=20)
 
         EXPECTED_DECODED_TEXT = "system\nYou are a helpful assistant.\nuser\nWhat's that sound and what kind of dog is this?\nassistant\nThe sound is glass shattering, and the dog appears to be a Labrador Retriever.\nuser\nHow about this one?\nassistant\nThe sound is a cough."
 
+        breakpoint()
         self.assertEqual(
             self.processor.decode(output[0], skip_special_tokens=True),
             EXPECTED_DECODED_TEXT,
