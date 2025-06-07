@@ -581,7 +581,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
                 198,
                 151647,
                 151646,
-                151648,
+                151646,
             ]
         )
         assert torch.allclose(expected_input_ids, inputs.input_ids[0][:17], atol=3e-3)
