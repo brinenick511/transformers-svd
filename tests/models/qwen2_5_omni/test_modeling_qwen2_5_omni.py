@@ -560,7 +560,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
 
         text = self.processor.apply_chat_template(self.messages, tokenize=False, add_generation_prompt=True)
         inputs = self.processor(
-            text=[text], audio=[self.raw_audio], images=[self.raw_image], return_tensors="pt", padding=True
+            text=text, audio=[self.raw_audio], images=[self.raw_image], return_tensors="pt", padding=True
         )
 
         expected_input_ids = torch.tensor(
