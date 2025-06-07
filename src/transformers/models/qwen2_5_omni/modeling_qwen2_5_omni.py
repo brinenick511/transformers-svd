@@ -4144,10 +4144,14 @@ class Qwen2_5OmniForConditionalGeneration(Qwen2_5OmniPreTrainedModel, Generation
         if self.token2wav.dtype != torch.float:
             self.token2wav.float()
 
+        token2wav_device = self.token2wav.device
+        if token2wav_device.dtype == "meta":
+            token2wav_device = self.thinker.device
+
         wav = self.token2wav(
-            talker_generate_codes.to(self.token2wav.device),
-            conditioning=speaker_params["cond"].to(self.token2wav.device).float(),
-            reference_mel=speaker_params["ref_mel"].to(self.token2wav.device).float(),
+            talker_generate_codes.to(token2wav_device),
+            conditioning=speaker_params["cond"].to(token2wav_device).float(),
+            reference_mel=speaker_params["ref_mel"].to(token2wav_device).float(),
             **token2wav_kwargs,
         )
 
