@@ -677,7 +677,6 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
 
         EXPECTED_DECODED_TEXT = "system\nYou are a helpful assistant.\nuser\nWhat's that sound and what kind of dog is this?\nassistant\nThe sound is glass shattering, and the dog appears to be a Labrador Retriever.\nuser\nHow about this one?\nassistant\nThe sound is a cough."
 
-        breakpoint()
         self.assertEqual(
             self.processor.decode(output[0], skip_special_tokens=True),
             EXPECTED_DECODED_TEXT,
@@ -686,7 +685,7 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
     @slow
     def test_small_model_integration_test_w_audio(self):
         model = Qwen2_5OmniForConditionalGeneration.from_pretrained(
-            "Qwen/Qwen2.5-Omni-7B", torch_dtype=torch.float32, device_map="auto"
+            "Qwen/Qwen2.5-Omni-7B", torch_dtype=torch.bfloat16, device_map="auto"
         )
         audio_url = "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen2-Audio/audio/guess_age_gender.wav"
 
@@ -708,9 +707,9 @@ class Qwen2_5OmniModelIntegrationTest(unittest.TestCase):
         audio, _ = librosa.load(BytesIO(urlopen(audio_url).read()), sr=self.processor.feature_extractor.sampling_rate)
 
         text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = self.processor(text=text, audio=[audio], return_tensors="pt", padding=True).to(torch_device)
+        inputs = self.processor(text=text, audio=[audio], return_tensors="pt", padding=True).to(torch_device, dtype=torch.bfloat16)
 
-        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False)
+        output = model.generate(**inputs, thinker_temperature=0, thinker_do_sample=False, max_new_tokens=20)
 
         EXPECTED_DECODED_TEXT = "system\nYou are Qwen, a virtual human developed by the Qwen Team, Alibaba Group, capable of perceiving auditory and visual inputs, as well as generating text and speech.\nuser\n\nassistant\nWell, I can't really guess your age and gender just from your voice. There are so many factors that can affect how a voice sounds, like the environment you're in, how you're feeling at the moment, and even the microphone you're using. But if you want to share more about your voice, like if it's high - pitched or low - pitched, that might give me a bit of an idea. So, what can you tell me about your voice?"
 
